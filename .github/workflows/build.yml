@@ -1,1 +1,62 @@
+name: Build The Chatters APK & AAB
 
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
+
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug
+
+      - name: Build Release AAB for Play Store
+        run: ./gradlew bundleRelease
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: The-Chatters-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Upload AAB Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: The-Chatters-AAB
+          path: app/build/outputs/bundle/release/app-release.aab
+
+      - name: Create Release with APK
+        uses: softprops/action-gh-release@v1
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: The Chatters v1.0.${{ github.run_number }}
+          files: |
+            app/build/outputs/apk/debug/app-debug.apk
+            app/build/outputs/bundle/release/app-release.aab
+          body: |
+            🚀 The Chatters - New Build!
+            - 27MB Fast Secure Free
+            - Chat, Groups, Status, Calls & Brain AI
+            
+            Download APK below 👇
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
