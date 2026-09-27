@@ -9,6 +9,10 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import com.thechatters.app.data.local.AppDatabase
+import com.thechatters.app.data.local.ChatDao
+import com.thechatters.app.data.local.MessageDao
+import com.thechatters.app.data.local.UserDao
+import com.thechatters.app.di.DatabaseModule
 import com.thechatters.app.data.model.BackupConfig
 import com.thechatters.app.data.model.BackupFrequency
 import com.thechatters.app.data.model.CallDirection
@@ -34,11 +38,13 @@ import java.io.FileOutputStream
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-class ChatRepository(private val context: Context) {
-    private val database = AppDatabase.getDatabase(context)
-    private val chatDao = database.chatDao()
-    private val messageDao = database.messageDao()
-    private val userDao = database.userDao()
+class ChatRepository(
+    private val context: Context,
+    private val database: AppDatabase = DatabaseModule.provideDatabase(context),
+    private val chatDao: ChatDao = DatabaseModule.provideChatDao(database),
+    private val messageDao: MessageDao = DatabaseModule.provideMessageDao(database),
+    private val userDao: UserDao = DatabaseModule.provideUserDao(database)
+) {
     private val workManager = WorkManager.getInstance(context)
     private val scope = CoroutineScope(Dispatchers.IO)
 
