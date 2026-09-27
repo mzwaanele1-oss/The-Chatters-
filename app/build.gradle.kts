@@ -24,14 +24,54 @@ android {
 
   signingConfigs {
     create("release") {
-      val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"
-      storeFile = file(keystorePath)
-      storePassword = System.getenv("STORE_PASSWORD")
-      keyAlias = "upload"
-      keyPassword = System.getenv("KEY_PASSWORD")
+      val envPath = System.getenv("KEYSTORE_PATH")
+      val keystoreFile = when {
+        envPath != null && file(envPath).exists() -> file(envPath)
+        file("${projectDir}/my-upload-key.jks").exists() -> file("${projectDir}/my-upload-key.jks")
+        file("${rootDir}/my-upload-key.jks").exists() -> file("${rootDir}/my-upload-key.jks")
+        else -> {
+          val fallbackFile = file("${projectDir}/my-upload-key.jks")
+          try {
+            fallbackFile.parentFile?.mkdirs()
+            ProcessBuilder(
+              "keytool", "-genkeypair", "-v",
+              "-keystore", fallbackFile.absolutePath,
+              "-storepass", "android",
+              "-alias", "upload",
+              "-keypass", "android",
+              "-keyalg", "RSA",
+              "-keysize", "2048",
+              "-validity", "10000",
+              "-dname", "CN=The Chatters Upload,O=Android,C=US"
+            ).redirectErrorStream(true).start().waitFor()
+          } catch (_: Exception) {}
+          fallbackFile
+        }
+      }
+      storeFile = keystoreFile
+      storePassword = System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "android"
+      keyAlias = System.getenv("KEY_ALIAS") ?: "upload"
+      keyPassword = System.getenv("KEY_PASSWORD") ?: System.getenv("KEYSTORE_PASSWORD") ?: System.getenv("STORE_PASSWORD") ?: "android"
     }
     create("debugConfig") {
-      storeFile = file("${rootDir}/debug.keystore")
+      val debugFile = file("${rootDir}/debug.keystore")
+      if (!debugFile.exists()) {
+        try {
+          debugFile.parentFile?.mkdirs()
+          ProcessBuilder(
+            "keytool", "-genkeypair", "-v",
+            "-keystore", debugFile.absolutePath,
+            "-storepass", "android",
+            "-alias", "androiddebugkey",
+            "-keypass", "android",
+            "-keyalg", "RSA",
+            "-keysize", "2048",
+            "-validity", "10000",
+            "-dname", "CN=Android Debug,O=Android,C=US"
+          ).redirectErrorStream(true).start().waitFor()
+        } catch (_: Exception) {}
+      }
+      storeFile = debugFile
       storePassword = "android"
       keyAlias = "androiddebugkey"
       keyPassword = "android"

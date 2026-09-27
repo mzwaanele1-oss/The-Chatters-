@@ -16,5 +16,10 @@
 local.properties
 .env
 debug.keystore
+debug.keystore.base64
+my-upload-key.jks
+app/my-upload-key.jks
+*.jks
+*.keystore
 .aistudio/
 .build-outputs/
