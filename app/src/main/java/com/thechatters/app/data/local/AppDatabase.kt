@@ -7,16 +7,18 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import com.thechatters.app.data.model.Chat
 import com.thechatters.app.data.model.Message
+import com.thechatters.app.data.model.User
 
 @Database(
-    entities = [Chat::class, Message::class],
-    version = 1,
+    entities = [Chat::class, Message::class, User::class],
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun chatDao(): ChatDao
     abstract fun messageDao(): MessageDao
+    abstract fun userDao(): UserDao
 
     companion object {
         @Volatile
@@ -29,7 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "the_chatters_database"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(true)
                     .build()
                 INSTANCE = instance
                 instance

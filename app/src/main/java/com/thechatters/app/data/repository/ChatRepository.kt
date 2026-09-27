@@ -38,6 +38,7 @@ class ChatRepository(private val context: Context) {
     private val database = AppDatabase.getDatabase(context)
     private val chatDao = database.chatDao()
     private val messageDao = database.messageDao()
+    private val userDao = database.userDao()
     private val workManager = WorkManager.getInstance(context)
     private val scope = CoroutineScope(Dispatchers.IO)
 
@@ -53,6 +54,10 @@ class ChatRepository(private val context: Context) {
         )
     )
     val currentUser = _currentUser.asStateFlow()
+
+    // Offline cached users & contacts from Room
+    val cachedUsers: Flow<List<User>> = userDao.getAllUsers()
+    val onlineCachedUsers: Flow<List<User>> = userDao.getOnlineUsers()
 
     // 24h Status stories
     private val _statusStories = MutableStateFlow<List<StatusStory>>(emptyList())
@@ -87,10 +92,52 @@ class ChatRepository(private val context: Context) {
 
     fun getAllChats(): Flow<List<Chat>> = chatDao.getAllChats()
 
+    fun getGroupChats(): Flow<List<Chat>> = chatDao.getGroupChats()
+
+    fun getDirectChats(): Flow<List<Chat>> = chatDao.getDirectChats()
+
+    fun searchChats(query: String): Flow<List<Chat>> = chatDao.searchChats(query)
+
     fun getMessagesForChat(chatId: String): Flow<List<Message>> =
         messageDao.getMessagesForChat(chatId)
 
+    fun getLatestMessageForChat(chatId: String): Flow<Message?> =
+        messageDao.getLatestMessageForChat(chatId)
+
+    fun searchMessages(chatId: String, query: String): Flow<List<Message>> =
+        messageDao.searchMessagesInChat(chatId, query)
+
+    fun searchAllMessages(query: String): Flow<List<Message>> =
+        messageDao.searchAllMessages(query)
+
     suspend fun getChat(chatId: String): Chat? = chatDao.getChatById(chatId)
+
+    fun getCachedUser(userId: String): Flow<User?> = userDao.getUserById(userId)
+
+    suspend fun getCachedUserOnce(userId: String): User? = userDao.getUserByIdOnce(userId)
+
+    suspend fun cacheUser(user: User) = userDao.insertUser(user)
+
+    suspend fun cacheUsers(users: List<User>) = userDao.insertUsers(users)
+
+    fun searchUsers(query: String): Flow<List<User>> = userDao.searchUsers(query)
+
+    suspend fun markChatAsRead(chatId: String) {
+        val userId = _currentUser.value.id
+        messageDao.markMessagesAsRead(chatId, userId)
+        val chat = chatDao.getChatById(chatId)
+        if (chat != null && chat.unreadCount > 0) {
+            chatDao.updateChat(chat.copy(unreadCount = 0))
+        }
+    }
+
+    suspend fun deleteMessage(messageId: String) {
+        messageDao.deleteMessage(messageId)
+    }
+
+    suspend fun clearChatMessages(chatId: String) {
+        messageDao.deleteMessagesForChat(chatId)
+    }
 
     suspend fun sendMessage(
         chatId: String,
@@ -379,7 +426,11 @@ class ChatRepository(private val context: Context) {
     }
 
     fun updateProfile(name: String, bio: String) {
-        _currentUser.value = _currentUser.value.copy(name = name, bio = bio)
+        val updated = _currentUser.value.copy(name = name, bio = bio)
+        _currentUser.value = updated
+        scope.launch {
+            userDao.insertUser(updated)
+        }
     }
 
     private fun formatTime(millis: Long): String {
@@ -388,6 +439,51 @@ class ChatRepository(private val context: Context) {
     }
 
     private suspend fun seedDefaultDataIfNeeded() {
+        // Restore or seed current user in Room database
+        val cachedSelf = userDao.getUserByIdOnce("current_user_id")
+        if (cachedSelf != null) {
+            _currentUser.value = cachedSelf
+        } else {
+            userDao.insertUser(_currentUser.value)
+        }
+
+        // Cache initial contacts/users for offline access
+        val defaultContacts = listOf(
+            User(
+                id = "sipho_id",
+                name = "Sipho Dlamini",
+                phoneNumber = "+268 7623 4567",
+                avatarUrl = null,
+                bio = "Sawubona! Coding & mobile innovator in Eswatini 🇸🇿",
+                isOnline = true
+            ),
+            User(
+                id = "nomsa_id",
+                name = "Nomsa Khumalo",
+                phoneNumber = "+268 7634 5678",
+                avatarUrl = null,
+                bio = "Mobile UX designer & photographer",
+                isOnline = false
+            ),
+            User(
+                id = "thabo_id",
+                name = "Thabo Simelane",
+                phoneNumber = "+268 7645 6789",
+                avatarUrl = null,
+                bio = "Sticker artist & Kotlin enthusiast",
+                isOnline = true
+            ),
+            User(
+                id = "brain_ai",
+                name = "Brain AI Assistant 🧠",
+                phoneNumber = "Brain AI",
+                avatarUrl = null,
+                bio = "AI assistant for smart summaries and Siswati translations",
+                isOnline = true
+            )
+        )
+        userDao.insertUsers(defaultContacts)
+
         val existingChats = chatDao.getChatById("chat_sipho")
         if (existingChats != null) return
 

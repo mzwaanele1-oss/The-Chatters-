@@ -45,6 +45,10 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // Offline cached users and contacts
+    val cachedUsers: StateFlow<List<com.thechatters.app.data.model.User>> = repository.cachedUsers
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     // Active Chat in Detail View
     private val _activeChatId = MutableStateFlow<String?>(null)
     val activeChatId = _activeChatId.asStateFlow()
@@ -70,12 +74,22 @@ class ChatViewModel(private val repository: ChatRepository) : ViewModel() {
     fun openChat(chatId: String) {
         _activeChatId.value = chatId
         viewModelScope.launch {
+            repository.markChatAsRead(chatId)
             _activeChat.value = repository.getChat(chatId)
             repository.getMessagesForChat(chatId).collect { msgs ->
                 _activeMessages.value = msgs
             }
         }
     }
+
+    fun deleteMessage(messageId: String) {
+        viewModelScope.launch {
+            repository.deleteMessage(messageId)
+        }
+    }
+
+    fun searchChatMessages(chatId: String, query: String) =
+        repository.searchMessages(chatId, query)
 
     fun closeChat() {
         _activeChatId.value = null

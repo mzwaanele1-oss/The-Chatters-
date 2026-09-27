@@ -1,6 +1,7 @@
 package com.thechatters.app.data.model
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 enum class MessageType {
@@ -19,7 +20,13 @@ enum class MessageStatus {
     READ
 }
 
-@Entity(tableName = "messages")
+@Entity(
+    tableName = "messages",
+    indices = [
+        Index(value = ["chatId"]),
+        Index(value = ["timestamp"])
+    ]
+)
 data class Message(
     @PrimaryKey val id: String,
     val chatId: String,
@@ -51,8 +58,14 @@ data class Chat(
     val description: String = ""
 )
 
+@Entity(
+    tableName = "users",
+    indices = [
+        Index(value = ["phoneNumber"])
+    ]
+)
 data class User(
-    val id: String,
+    @PrimaryKey val id: String,
     val name: String,
     val phoneNumber: String,
     val avatarUrl: String? = null,
