@@ -1,0 +1,9 @@
+{
+  "name": "The Chatters",
+  "description": "Next-generation messaging app with realtime chats, media sharing, reactions, sticker maker, groups, 24h status stories, WebRTC calls, Brain AI assistant with Gemini, and Drive backup.",
+  "package": "com.thechatters.app",
+  "version": "1.0.0",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
