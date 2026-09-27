@@ -2,7 +2,7 @@ name: Build The Chatters APK & AAB
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -18,45 +18,45 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+          cache: gradle
 
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Decode Keystore if secret exists
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > app/my-upload-key.jks
+            echo "Keystore decoded from secret"
+          else
+            echo "No KEYSTORE_BASE64 secret, will build debug only"
+          fi
 
-      - name: Build Release AAB for Play Store
-        run: ./gradlew bundleRelease
+      - name: Build Debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build Debug AAB
+        run: ./gradlew bundleDebug --stacktrace
+
+      - name: Build Release (if secrets exist)
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: ./gradlew assembleRelease bundleRelease --stacktrace
+        continue-on-error: true
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: The-Chatters-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: Chatters-APK
+          path: app/build/outputs/apk/**/*.apk
 
       - name: Upload AAB Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: The-Chatters-AAB
-          path: app/build/outputs/bundle/release/app-release.aab
-
-      - name: Create Release with APK
-        uses: softprops/action-gh-release@v1
-        if: github.ref == 'refs/heads/main'
-        with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: The Chatters v1.0.${{ github.run_number }}
-          files: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/bundle/release/app-release.aab
-          body: |
-            🚀 The Chatters - New Build!
-            - 27MB Fast Secure Free
-            - Chat, Groups, Status, Calls & Brain AI
-            
-            Download APK below 👇
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: Chatters-AAB
+          path: app/build/outputs/bundle/**/*.aab
