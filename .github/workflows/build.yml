@@ -1,53 +1,44 @@
-name: Build The Chatters APK & AAB
+name: Build & Release
 
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: gradle
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Decode Keystore if secret exists
+      - run: chmod +x ./gradlew
+      
+      - name: Create local.properties
         env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          ONESIGNAL_ID: ${{ secrets.ONESIGNAL_ID }}
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > app/my-upload-key.jks
-            echo "Keystore decoded from secret"
-          else
-            echo "No KEYSTORE_BASE64 secret, will build debug only"
-          fi
+          echo "supabaseUrl=$SUPABASE_URL" >> local.properties
+          echo "supabaseKey=$SUPABASE_KEY" >> local.properties
+          echo "oneSignalId=$ONESIGNAL_ID" >> local.properties
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build APK & AAB
+        run: |
+          ./gradlew assembleDebug
+          ./gradlew bundleDebug
 
-      - name: Build Debug AAB
-        run: ./gradlew bundleDebug --stacktrace
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
         with:
-          name: Chatters-APK
-          path: app/build/outputs/apk/debug/*.apk
-
-      - name: Upload AAB Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Chatters-AAB
-          path: app/build/outputs/bundle/debug/*.aab
+          files: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/bundle/debug/*.aab
